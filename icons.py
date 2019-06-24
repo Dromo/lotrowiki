@@ -35,6 +35,7 @@ class IconEditor(object):
         self.bg_image = np.zeros((300,300,3), np.uint8)
         self.bg_image[50:100,:] = (255,255,255)
         self.bg_image[200:300,:] = (255,255,255)
+        self.comment = "Drono-bot uploaded a version without corners."
 
     def set_options(self, *args):
         my_args = pywikibot.handle_args(args)
@@ -92,28 +93,39 @@ class IconEditor(object):
         while(1):
             cv2.imshow(filename,img_show)
             k = cv2.waitKey(0)
+            cv2.destroyAllWindows()
             k = chr(k & 255)
             if k == -1:
                 continue
             elif k == 'c':
                 cv2.imwrite(filename,rgba)
-                result = page.upload(source=filename, ignore_warnings="exists",comment="Drono-bot uploaded a version without corners.")
+                result = page.upload(source=filename,
+                    ignore_warnings="exists", comment=self.comment)
                 if result:
                     pywikibot.output("File "+filename+" uploaded seccesfuly")
                     self.edited += 1
                 else:
                     pywikibot.output("Error uploading "+filename)
+                    try:
+                        answer = pywikibot.input_choice(
+                            "Upload if dupliciate?",
+                            [('Yes', 'y'), ('No', 'n')])
+                    except pywikibot.bot_choice.QuitKeyboardInterrupt:
+                        break
+                    if answer == 'y':
+                        result = page.upload(source=filename,
+                            ignore_warnings='exists,duplicate',
+                            comment = self.comment)
+                        self.edited += 1
                 break
             elif k == 'q':
                 os.remove(filename)
-                cv2.destroyAllWindows()
                 pywikibot.output('Changed '+str(self.edited)+' icons.')
                 sys.exit(0)
             else:
                 print('Skipping image '+filename)
                 break
         os.remove(filename)
-        cv2.destroyAllWindows()
 
 
     def run(self):
