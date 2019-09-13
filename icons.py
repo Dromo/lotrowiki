@@ -29,6 +29,7 @@ class IconEditor(object):
     def __init__(self, *args):
         self.page = None
         self.category = None
+        self.file = None
         self.set_options(*args)
         self.site = pywikibot.Site()
         self.edited = 0
@@ -41,13 +42,19 @@ class IconEditor(object):
         my_args = pywikibot.handle_args(args)
         parser = argparse.ArgumentParser(add_help=False)
         parser.add_argument('-cat','--category', help='Edit category')
+        parser.add_argument('-f', '--file', help='File with page per line')
         parser.add_argument('page', nargs='?', help='Page to edit')
         self.options = parser.parse_args(my_args)
 
-        if self.options.page and self.options.category:
-            pywikibot.error('Please use either page or category.')
+        if self.options.page and self.options.category and self.options.file:
+            pywikibot.error('No page(s) specified')
             sys.exit(1)
-        if self.options.category:
+        if self.options.file:
+            self.file = self.options.file
+            if not os.path.isfile(self.file):
+                pywikibot.error('File "'+self.file+'" does not exist!')
+                sys.exit(1)
+        elif self.options.category:
             self.category = self.options.category
         else:
             self.page = self.options.page or pywikibot.input('Page to edit:')
@@ -139,6 +146,11 @@ class IconEditor(object):
             for page in gen:
                 page = pywikibot.FilePage(page)
                 self.edit_page(page)
+        elif self.file:
+            with open(self.file, "r") as f:
+                for line in f:
+                    page = pywikibot.FilePage(self.site, line)
+                    self.edit_page(page)
         pywikibot.output('Changed '+str(self.edited)+' icons.')
 
 
