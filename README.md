@@ -6,6 +6,8 @@
 
 
 the scripts assume the following folder structure inside pywkibots userscripts
+<pre>
 userscripts/
-- lotrowiki/     - this repository
-- data/          - folder containing lotro companion data repositories
+    lotrowiki/     - this repository
+    data/          - folder containing lotro companion data repositories
+</pre>
