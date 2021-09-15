@@ -5,9 +5,9 @@
 #
 from lxml import etree as ET
 import os
-import worth
-import deed
-import functions as lf
+from . import worth
+from . import deed
+from . import functions as lf
 
 class Titles(object):
     __instance = None
