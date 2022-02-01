@@ -21,15 +21,19 @@ class Worth(object):
                 "Use 'Worth.getInstance()'")
         else:
             Worth.__instance = self
-        pathToXml = "../data/lotro-data/items/valueTables.xml"
+        dirr = "../data"
+        pathToXml = dirr+"/lotro-data/items/valueTables.xml"
         pathToXml = os.path.join(os.path.dirname(__file__), pathToXml)
         self.wroot = ET.parse(pathToXml).getroot()
-        pathToXml = "../data/lotro-data/items/disenchantments.xml"
+        pathToXml = dirr+"/lotro-data/items/disenchantments.xml"
         pathToXml = os.path.join(os.path.dirname(__file__), pathToXml)
         self.droot = ET.parse(pathToXml).getroot()
 
     def getValue(self, table_id, level, quality):
         table = self.wroot.find(".//*[@id='%s']"%(table_id))
+        quality = quality.upper()
+        if quality == "EPIC":
+            quality = "LEGENDARY"
         factor = table.find(".//quality[@key='%s']"%(quality)).get('factor')
         value = table.find(".//baseValue[@level='%s']"%(level)).get('value')
         value = int(float(value) * float(factor))

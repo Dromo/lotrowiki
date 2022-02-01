@@ -21,6 +21,16 @@ class Barter(object):
             pathToXml = os.path.join(os.path.dirname(__file__), pathToXml)
             self.root = ET.parse(pathToXml).getroot()
             self.requirments = dict()
+            #TEMP
+            pathToXml = "../data/lotro-data/quests/quests.xml"
+            pathToXml = os.path.join(os.path.dirname(__file__), pathToXml)
+            self.qroot = ET.parse(pathToXml).getroot()
+            pathToXml = "../data/lotro-data/deeds/deeds.xml"
+            pathToXml = os.path.join(os.path.dirname(__file__), pathToXml)
+            self.droot = ET.parse(pathToXml).getroot()
+            pathToXml = "../data/lotro-data/common/factions.xml"
+            pathToXml = os.path.join(os.path.dirname(__file__), pathToXml)
+            self.froot = ET.parse(pathToXml).getroot()
 
     def getInstance():
         if Barter.__instance == None:
@@ -32,12 +42,7 @@ class Barter(object):
         rid = item.get('key')
         for elem in self.root.findall(".//receive[@id='%s']"%(rid)):
             elem = elem.getparent()
-            quantity = elem.find('give').get('quantity')
-            currency = elem.find('give').get('name')
-            if quantity == None:
-                quantity = ""
-            if currency == None:
-                currency = ""
+            give = elem.findall('give')
             elem = elem.getparent()
             require = elem.get('requiredQuest')
             if require != None:
@@ -59,15 +64,120 @@ class Barter(object):
                 barterName = barter.getparent().get('name')
                 barterNames.add(barterName)
             barterName = "]], [[".join(barterNames)
-            print(barterName)
+            givestr = ""
+            for g in give:
+                quantity = g.get('quantity')
+                if quantity is None:
+                    quantity = ""
+                else:
+                    quantity = "|" + quantity
+                givestr = givestr + "{{Reward|" + g.get('name')
+                givestr = givestr + quantity + "}}{{!!}}"
+            if givestr != "":
+                givestr = givestr[:-6]
             output = output + """
 == Barter Information ==
-{{Barter
-| npc    = [["""+barterName+"""]] """+require+"""
-| colums = 2
-| get1   = {{Reward|"""+item.get('name')+"""}}
-| give1  = {{Reward|"""+currency+"""|"""+quantity+"""}}
+{{Barterer
+| npc     = [["""+barterName+"""]] """+require+"""
+| columns = """+str(len(give)+1)+"""
+| get1    = {{Reward|{{subst:BASEPAGENAME}}}}
+| give1   = """+givestr+"""
 }}
 """
         return output
+
+    def getBartererTable(self, name):
+        barterer = self.root.findall(".//barterer[@name='%s']"%(name))
+        if len(barterer) > 1:
+            print("Found "+lenbarter+" barterers with name "+name)
+        elif len(barterer) < 1:
+            print("Barterer name "+name+" not found.")
+            return
+        barterer = barterer[0]
+        profiles = barterer.findall('barterProfile')
+        result = ""
+        for profile in profiles:
+            result += self.getProfileTable(profile.get("profileId"))
+        return result
+
+    def getProfileTable(self, profileId):
+        profile = self.root.find("./barterProfile[@profileId='%s']"%profileId)
+        requiredQ = profile.get("requiredQuest")
+        requiredF = profile.get("requiredFaction")
+        require = ""
+        if requiredQ is not None:
+            requiredQ = requiredQ.split(';')[0]
+            quest = self.qroot.find(".//quest[@id='%s']"%requiredQ)
+            if quest is None:
+                quest = self.droot.find(".//deed[@id='%s']"%requiredQ)
+            require += "Require completion of "+quest.get('name')
+        if requiredF is not None:
+            requiredF, tier = requiredF.split(';')
+            faction = self.froot.find(".//faction[@id='%s']"%requiredF)
+            fname = faction.get('name')
+            flevel = faction.find("./level[@tier='%s']"%tier).get('name')
+            the = "" if fname[:3].lower() == "the" else "the "
+            if len(require) > 0:
+                require +="\n"
+            require += "Require "+flevel+" standing with "+the+fname
+#        print("'"+require+"'")
+        tbody = ""
+        for entry in profile.findall("barterEntry"):
+            givemax = 0
+            given = 0
+            givestr = ""
+            for give in entry.findall("give"):
+                given += 1
+                gquantity = give.get("quantity")
+                gquantity = "|"+gquantity if gquantity is not None else ""
+                givestr +=" || {{Reward|"+give.get("name")+gquantity+"}}"
+            givemax = max(given, givemax)
+            receive = entry.find("receive")
+            if receive is None:
+                receive = entry.find("receiveReputation")
+                if receive is not None:
+                    rquantity = receive.get("quantity")
+                    rquantity = "|"+rquantity if rquantity is not None else ""
+                    receivestr = rquantity+receive.get("factionName")
+                else:
+                    print(profileId+ " has unexpected entry")
+                continue
+            rquantity = receive.get("quantity")
+            rquantity = "|"+rquantity if rquantity is not None else ""
+            receivestr = "{{Reward|"+receive.get("name")+rquantity+"}}"
+            pname = profile.get('name')
+            if "Traceries" in pname:
+                receivestr = "{{Reward|"+receive.get("name")
+                quality = ["Uncommon","Rare","Legendary","Incomparable"]
+                level = pname[pname.find("Lvl"):]
+                level = level.split(',')[0][4:]
+                level = "45" if level == "50" else level
+                for q in quality:
+                    if q.lower() in pname.lower():
+                        receivestr += " ("+q+", Level "+level+")}}"
+            rowstr = "\n|-\n| "+receivestr+givestr
+            tbody += rowstr
+        theader = '{| class="altRowsMed collapsible collapsed"'\
+            'style="width:800px;" \n'\
+            '! colspan="'+str(givemax+1)+'" style="text-align: center;" | '\
+            +profile.get('name')+'\n|-'\
+            '\n! style="width:40%;" | Item to Receive\n'\
+            '! colspan="'+str(givemax)+'" style="width:60%;" | Items to Trade'
+        return theader + tbody + "\n|}\n"
+
+    def testRequirements(self):
+        #profiles with both requiredQuest and requiredFaction
+        profiles = self.root.findall("./barterProfile")
+        for profile in profiles:
+            if profile.get("requiredQuest") is not None:
+                if profile.get("requiredFaction") is not None:
+                    print(profile.get("profileId"))
+        return
+
+    def generateProfiles(self):
+        barterers = self.root.findall('barterer')
+        for barterer in barterers:
+            profiles = barterer.findall('barterProfile')
+            for profile in profiles:
+                self.getProfileTable(profile.get("profileId"))
 
